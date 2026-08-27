@@ -1,170 +1,247 @@
-import { useState } from "react";
-import { CATEGORIES, type CategoryId } from "./data/questions";
-import type { PreparedQuestion, RowResult } from "./types";
-import Backdrop from "./components/Backdrop";
-import Ticker from "./components/Ticker";
-import StartScreen from "./components/StartScreen";
-import QuizScreen from "./components/QuizScreen";
-import ResultScreen from "./components/ResultScreen";
-import { IconStar } from "./components/Icons";
+import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import type { ModeData, Persist, Project, Status, Task, Texture, Theme } from "./types";
+import { uid } from "./types";
+import { PROJECT_COLORS, load, save } from "./store";
+import Header from "./components/Header";
+import Sidebar from "./components/Sidebar";
+import Board from "./components/Board";
+import TaskDrawer from "./components/TaskDrawer";
+import { IInbox } from "./components/Icons";
 
-const BEST_KEY = "testlab:best:v1";
-
-type Phase = "start" | "quiz" | "result";
-
-const TICKER_ITEMS = [
-  "Наука",
-  "История",
-  "Логика",
-  "20 секунд на вопрос",
-  "8 вопросов в подходе",
-  "Без права возврата",
-  "+1 за верный ответ",
-  "Тест·Лаб",
-];
-
-function shuffle<T>(arr: T[]): T[] {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-
-function buildRun(catId: CategoryId): PreparedQuestion[] {
-  const cat = CATEGORIES.find((c) => c.id === catId)!;
-  return shuffle(cat.questions).map((q) => {
-    const opts = shuffle(q.options.map((text, i) => ({ text, isCorrect: i === q.answer })));
-    return {
-      question: q.q,
-      options: opts.map((o) => o.text),
-      correct: opts.findIndex((o) => o.isCorrect),
-      fact: q.fact,
-    };
-  });
-}
-
-function loadBest(): Partial<Record<CategoryId, number>> {
-  try {
-    return JSON.parse(localStorage.getItem(BEST_KEY) || "{}");
-  } catch {
-    return {};
-  }
-}
+const FLY_MS = 780;
 
 export default function App() {
-  const [phase, setPhase] = useState<Phase>("start");
-  const [catId, setCatId] = useState<CategoryId>("science");
-  const [prepared, setPrepared] = useState<PreparedQuestion[]>([]);
-  const [rows, setRows] = useState<RowResult[]>([]);
-  const [isRecord, setIsRecord] = useState(false);
-  const [best, setBest] = useState<Partial<Record<CategoryId, number>>>(loadBest);
+  const [state, setState] = useState<Persist>(load);
+  const [flyingTask, setFlyingTask] = useState<string | null>(null);
+  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
 
-  const category = CATEGORIES.find((c) => c.id === catId)!;
+  useEffect(() => save(state), [state]);
 
-  function start(id: CategoryId) {
-    setCatId(id);
-    setPrepared(buildRun(id));
-    setRows([]);
-    setIsRecord(false);
-    setPhase("quiz");
-    window.scrollTo({ top: 0 });
-  }
+  const { mode } = state;
+  const theme = state.themes[mode];
+  const data = state.data[mode];
+  const project = data.projects.find((p) => p.id === data.activeId) ?? data.projects[0] ?? null;
+  const openTask = project?.tasks.find((t) => t.id === openTaskId) ?? null;
+  const openCount = data.projects.reduce(
+    (n, p) => n + p.tasks.filter((t) => t.status !== "completed").length,
+    0
+  );
 
-  function finish(finishedRows: RowResult[]) {
-    setRows(finishedRows);
-    const score = finishedRows.filter((r) => r.correct).length;
-    const prev = best[catId];
-    if (prev != null && score > prev) {
-      setIsRecord(true);
-    } else {
-      setIsRecord(false);
-    }
-    if (prev == null || score > prev) {
-      const next = { ...best, [catId]: score };
-      setBest(next);
-      try {
-        localStorage.setItem(BEST_KEY, JSON.stringify(next));
-      } catch {
-        /* приватный режим — не страшно */
-      }
-    }
-    setPhase("result");
-    window.scrollTo({ top: 0 });
-  }
+  /* применение темы и режима к документу */
+  useEffect(() => {
+    const el = document.documentElement;
+    el.style.setProperty("--accent", theme.accent);
+    el.dataset.dark = String(theme.dark);
+    el.dataset.mode = mode;
+    el.dataset.texture = theme.texture;
+  }, [theme, mode]);
+
+  /* ---------- помощники ---------- */
+
+  const patchData = (fn: (d: ModeData) => ModeData) =>
+    setState((s) => ({ ...s, data: { ...s.data, [s.mode]: fn(s.data[s.mode]) } }));
+
+  const patchProject = (pid: string, fn: (p: Project) => Project) =>
+    patchData((d) => ({ ...d, projects: d.projects.map((p) => (p.id === pid ? fn(p) : p)) }));
+
+  const patchTask = (tid: string, fn: (t: Task) => Task) => {
+    if (project) patchProject(project.id, (p) => ({ ...p, tasks: p.tasks.map((t) => (t.id === tid ? fn(t) : t)) }));
+  };
+
+  /* ---------- режим и тема ---------- */
+
+  const toggleMode = () => {
+    setOpenTaskId(null);
+    setFlyingTask(null);
+    setState((s) => ({ ...s, mode: s.mode === "work" ? "home" : "work" }));
+  };
+
+  const setTheme = (patch: Partial<Theme>) =>
+    setState((s) => ({ ...s, themes: { ...s.themes, [s.mode]: { ...s.themes[s.mode], ...patch } } }));
+
+  /* ---------- проекты ---------- */
+
+  const addProject = (name: string) => {
+    const p: Project = {
+      id: uid(),
+      name,
+      color: PROJECT_COLORS[data.projects.length % PROJECT_COLORS.length],
+      tasks: [],
+    };
+    patchData((d) => ({ projects: [...d.projects, p], activeId: p.id }));
+  };
+
+  const renameProject = (id: string, name: string) => patchProject(id, (p) => ({ ...p, name }));
+
+  const deleteProject = (id: string) =>
+    patchData((d) => {
+      const projects = d.projects.filter((p) => p.id !== id);
+      return { projects, activeId: d.activeId === id ? projects[0]?.id ?? null : d.activeId };
+    });
+
+  /* ---------- задачи ---------- */
+
+  const addTask = (title: string) => {
+    if (!project) return;
+    const t: Task = { id: uid(), title, status: "created", subtasks: [], comments: [], ts: Date.now() };
+    patchProject(project.id, (p) => ({ ...p, tasks: [t, ...p.tasks] }));
+  };
+
+  const setStatus = (tid: string, s: Status) => patchTask(tid, (t) => ({ ...t, status: s }));
+
+  /* закрытие = подпрыгнуть и улететь вниз, затем смена статуса */
+  const completeTask = (tid: string) => {
+    setFlyingTask(tid);
+    window.setTimeout(() => {
+      patchTask(tid, (t) => ({ ...t, status: "completed" }));
+      setFlyingTask(null);
+    }, FLY_MS);
+  };
+
+  const chooseStatus = (tid: string, s: Status) => {
+    const t = project?.tasks.find((x) => x.id === tid);
+    if (!t) return;
+    if (s === "completed" && t.status !== "completed") completeTask(tid);
+    else if (s !== t.status) setStatus(tid, s);
+  };
+
+  /* ---------- подзадачи и комментарии ---------- */
+
+  const addSub = (tid: string, title: string) =>
+    patchTask(tid, (t) => ({ ...t, subtasks: [...t.subtasks, { id: uid(), title, done: false, comments: [] }] }));
+
+  const toggleSub = (tid: string, sid: string) =>
+    patchTask(tid, (t) => ({
+      ...t,
+      subtasks: t.subtasks.map((s) => (s.id === sid ? { ...s, done: !s.done } : s)),
+    }));
+
+  const deleteSub = (tid: string, sid: string) =>
+    patchTask(tid, (t) => ({ ...t, subtasks: t.subtasks.filter((s) => s.id !== sid) }));
+
+  const addTaskComment = (tid: string, text: string) =>
+    patchTask(tid, (t) => ({ ...t, comments: [...t.comments, { id: uid(), text, ts: Date.now() }] }));
+
+  const addSubComment = (tid: string, sid: string, text: string) =>
+    patchTask(tid, (t) => ({
+      ...t,
+      subtasks: t.subtasks.map((s) =>
+        s.id === sid ? { ...s, comments: [...s.comments, { id: uid(), text, ts: Date.now() }] } : s
+      ),
+    }));
+
+  const deleteTask = (tid: string) => {
+    if (!project) return;
+    patchProject(project.id, (p) => ({ ...p, tasks: p.tasks.filter((t) => t.id !== tid) }));
+    setOpenTaskId(null);
+  };
+
+  /* ---------- разметка ---------- */
 
   return (
-    <div className="relative flex min-h-screen flex-col">
-      <Backdrop />
+    <div className="relative min-h-screen">
+      <BackgroundFX texture={theme.texture} />
 
-      {/* шапка */}
-      <header className="sticky top-0 z-30 border-b-2 border-ink bg-paper">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-5 py-3.5">
-          <button
-            onClick={() => phase !== "quiz" && setPhase("start")}
-            className={`flex items-center gap-2.5 font-display text-lg font-extrabold tracking-[0.12em] ${
-              phase === "quiz" ? "cursor-default" : "transition-transform hover:-translate-y-0.5"
-            }`}
-            aria-label="На главный экран"
+      <Header
+        mode={mode}
+        onToggleMode={toggleMode}
+        theme={theme}
+        onTheme={setTheme}
+        openCount={openCount}
+      />
+
+      <div className="relative z-10 flex flex-col md:flex-row">
+        <Sidebar
+          projects={data.projects}
+          activeId={project?.id ?? null}
+          onSelect={(id) => patchData((d) => ({ ...d, activeId: id }))}
+          onAdd={addProject}
+          onRename={renameProject}
+          onDelete={deleteProject}
+        />
+
+        <main className="min-w-0 flex-1">
+          <motion.div
+            key={mode}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, ease: [0.2, 1, 0.4, 1] }}
+            className="mx-auto w-full max-w-5xl p-4 md:p-7"
           >
-            <span className="grid size-6 place-items-center border-2 border-ink bg-signal">
-              <span className="size-2 bg-paper" />
-            </span>
-            ТЕСТ·ЛАБ
-          </button>
+            {project ? (
+              <Board
+                project={project}
+                flyingTask={flyingTask}
+                onAdd={addTask}
+                onOpen={setOpenTaskId}
+                onAdvance={(id) => setStatus(id, "progress")}
+                onComplete={completeTask}
+                onReopen={(id) => setStatus(id, "progress")}
+              />
+            ) : (
+              <EmptyState mode={mode} />
+            )}
+          </motion.div>
+        </main>
+      </div>
 
-          <p className="hidden text-xs uppercase tracking-[0.3em] text-ink-soft md:block">
-            интерактивная проверка знаний
-          </p>
-
-          <div className="flex items-center gap-3">
-            <span className="flex items-center gap-1.5 border-2 border-ink bg-paper px-2.5 py-1 font-display text-[11px] font-bold tracking-[0.14em]">
-              <IconStar size={13} className="text-warn" />
-              {best[catId] != null ? `${best[catId]}/8` : "—/8"}
-            </span>
-            <span className="hidden border-2 border-ink bg-ink px-2.5 py-1 font-display text-[11px] font-bold uppercase tracking-[0.14em] text-paper sm:block">
-              пр. 07
-            </span>
-          </div>
-        </div>
-      </header>
-
-      <Ticker items={TICKER_ITEMS} />
-
-      <main className="relative z-10 flex-1">
-        {phase === "start" && <StartScreen best={best} onStart={start} />}
-        {phase === "quiz" && (
-          <QuizScreen
-            category={category}
-            questions={prepared}
-            onFinish={finish}
-            onExit={() => setPhase("start")}
+      <AnimatePresence>
+        {openTask && (
+          <TaskDrawer
+            key={openTask.id}
+            task={openTask}
+            onClose={() => setOpenTaskId(null)}
+            onRename={(title) => patchTask(openTask.id, (t) => ({ ...t, title }))}
+            onStatus={(s) => chooseStatus(openTask.id, s)}
+            onAddSub={(title) => addSub(openTask.id, title)}
+            onToggleSub={(sid) => toggleSub(openTask.id, sid)}
+            onDeleteSub={(sid) => deleteSub(openTask.id, sid)}
+            onTaskComment={(text) => addTaskComment(openTask.id, text)}
+            onSubComment={(sid, text) => addSubComment(openTask.id, sid, text)}
+            onDelete={() => deleteTask(openTask.id)}
           />
         )}
-        {phase === "result" && (
-          <ResultScreen
-            rows={rows}
-            catTitle={category.title}
-            isRecord={isRecord}
-            bestScore={best[catId] ?? rows.filter((r) => r.correct).length}
-            onRetry={() => start(catId)}
-            onChangeTheme={() => {
-              setPhase("start");
-              window.scrollTo({ top: 0 });
-            }}
-          />
-        )}
-      </main>
+      </AnimatePresence>
+    </div>
+  );
+}
 
-      {/* подвал */}
-      <footer className="relative z-10 border-t-2 border-ink bg-paper">
-        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-5 py-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-ink-soft">
-          <span>Тест·Лаб — тренажёр извилин</span>
-          <span>24 вопроса · 3 темы · 20 секунд на ход</span>
-          <span>© 2026 · сделано без шпаргалок</span>
-        </div>
-      </footer>
+/* ---------------- пустое состояние ---------------- */
+
+function EmptyState({ mode }: { mode: "work" | "home" }) {
+  return (
+    <div className="grid min-h-[60vh] place-items-center">
+      <div className="max-w-sm text-center">
+        <span className="mx-auto mb-5 grid size-16 place-items-center rounded-2xl border border-dashed border-line bg-surface text-mut">
+          <IInbox size={28} />
+        </span>
+        <h2 className="font-display text-lg font-bold">Пока нет проектов</h2>
+        <p className="mt-2 text-sm leading-relaxed text-mut">
+          Создайте первый проект кнопкой <b className="text-ink">«Новый проект»</b> в списке слева
+          (на телефоне — сверху). {mode === "work" ? "Работа сама себя не сделает." : "Дом сам себя не уберёт."}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- живой фон ---------------- */
+
+function BackgroundFX({ texture }: { texture: Texture }) {
+  return (
+    <div aria-hidden className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+      {texture === "grid" && <div className="absolute inset-0 tex-grid" />}
+      {texture === "dots" && <div className="absolute inset-0 tex-dots" />}
+      <div
+        className="absolute -top-40 right-[-12%] size-[460px] rounded-full"
+        style={{ background: "radial-gradient(circle, color-mix(in srgb, var(--accent) 11%, transparent), transparent 68%)" }}
+      />
+      <div
+        className="absolute bottom-[-18%] left-[-10%] size-[420px] rounded-full"
+        style={{ background: "radial-gradient(circle, color-mix(in srgb, var(--accent) 8%, transparent), transparent 68%)" }}
+      />
+      <div className="absolute inset-0 noise" />
     </div>
   );
 }
