@@ -1,1 +1,149 @@
 @import "tailwindcss";
+
+@theme {
+  --font-display: "Unbounded", "Golos Text", sans-serif;
+  --font-body: "Golos Text", "Segoe UI", sans-serif;
+
+  --color-paper: #f1efe8;
+  --color-paper-deep: #e6e3d6;
+  --color-ink: #17150f;
+  --color-ink-soft: #57534a;
+  --color-signal: #d8362b;
+  --color-signal-deep: #a92720;
+  --color-cobalt: #2b4bd7;
+  --color-pass: #1f7a45;
+  --color-warn: #b97c0e;
+
+  --shadow-hard-sm: 3px 3px 0 0 #17150f;
+  --shadow-hard: 5px 5px 0 0 #17150f;
+  --shadow-hard-lg: 8px 8px 0 0 #17150f;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  overflow-x: hidden;
+}
+
+::selection {
+  background: var(--color-signal);
+  color: var(--color-paper);
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-cobalt);
+  outline-offset: 2px;
+}
+
+/* ---------- keyframes ---------- */
+
+@keyframes marquee {
+  to { transform: translateX(-50%); }
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-q {
+  from { opacity: 0; transform: translateX(36px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes stamp-in {
+  0% { opacity: 0; transform: scale(2) rotate(-18deg); }
+  55% { opacity: 1; }
+  75% { transform: scale(0.94) rotate(var(--stamp-rot, -6deg)); }
+  100% { opacity: 1; transform: scale(1) rotate(var(--stamp-rot, -6deg)); }
+}
+
+@keyframes blink-step {
+  50% { opacity: 0.15; }
+}
+
+@keyframes spin-slow {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes float-y {
+  from { transform: translateY(-6px); }
+  to { transform: translateY(8px); }
+}
+
+@keyframes bar-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+@keyframes tick-pop {
+  0% { transform: scale(0.4); }
+  70% { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+
+/* ---------- animation utilities ---------- */
+
+.animate-marquee { animation: marquee 30s linear infinite; }
+.rise { animation: rise 0.55s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.slide-q { animation: slide-q 0.45s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.stamp-in { animation: stamp-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.blink { animation: blink-step 1.1s steps(2, jump-none) infinite; }
+.spin-slow { animation: spin-slow 14s linear infinite; }
+.float-y { animation: float-y 5s ease-in-out infinite alternate; }
+.bar-danger { animation: bar-pulse 0.5s ease-in-out infinite; }
+.tick-pop { animation: tick-pop 0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* ---------- texture & print utilities ---------- */
+
+.grid-paper {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--color-ink) 6%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--color-ink) 6%, transparent) 1px, transparent 1px);
+  background-size: 34px 34px;
+}
+
+.noise {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.05;
+  mix-blend-mode: multiply;
+}
+
+.dots {
+  background-image: radial-gradient(color-mix(in srgb, var(--color-ink) 22%, transparent) 1.4px, transparent 1.4px);
+  background-size: 14px 14px;
+}
+
+.text-outline {
+  -webkit-text-stroke: 2px color-mix(in srgb, var(--color-ink) 22%, transparent);
+  color: transparent;
+}
+
+.text-outline-signal {
+  -webkit-text-stroke: 2px color-mix(in srgb, var(--color-signal) 45%, transparent);
+  color: transparent;
+}
+
+.stripes {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    var(--color-ink) 0 8px,
+    transparent 8px 16px
+  );
+}
+
+.thin-scroll::-webkit-scrollbar { width: 8px; }
+.thin-scroll::-webkit-scrollbar-track { background: var(--color-paper-deep); }
+.thin-scroll::-webkit-scrollbar-thumb { background: var(--color-ink); border: 2px solid var(--color-paper-deep); }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee, .rise, .slide-q, .stamp-in, .blink, .spin-slow, .float-y, .bar-danger, .tick-pop {
+    animation: none !important;
+  }
+}
