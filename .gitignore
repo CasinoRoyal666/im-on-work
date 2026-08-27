@@ -1,5 +1,35 @@
+# зависимости
+node_modules
+
+# сборка
+dist
+dist-ssr
+
+# локальные конфиги и переменные окружения
+*.local
+.env
+.env.*
+
+# логи
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# кэши
+.cache
+.eslintcache
+*.tsbuildinfo
+
+# ОС и редакторы
+.DS_Store
+Thumbs.db
+.idea
+.vscode/*
+!.vscode/extensions.json
 node_modules/
 .next/
 dist/
 build/
-*.log
