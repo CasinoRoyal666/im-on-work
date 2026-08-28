@@ -1,8 +1,6 @@
 import type { Persist } from "./types";
 import { uid } from "./types";
 
-const KEY = "imonwork:v1";
-
 export const PROJECT_COLORS = [
   "#0e7c6b",
   "#2e66e5",
@@ -23,7 +21,7 @@ export const ACCENT_PRESETS = [
   "#c9970f",
 ];
 
-function seed(): Persist {
+export function seed(): Persist {
   const now = Date.now();
   const day = 86_400_000;
   return {
@@ -114,25 +112,4 @@ function seed(): Persist {
       },
     },
   };
-}
-
-export function load(): Persist {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (raw) {
-      const p = JSON.parse(raw) as Persist;
-      if (p && p.data && p.themes && p.data.work && p.data.home) return p;
-    }
-  } catch {
-    /* повреждённые данные — начнём заново */
-  }
-  return seed();
-}
-
-export function save(p: Persist) {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(p));
-  } catch {
-    /* приватный режим — молча пропускаем */
-  }
 }

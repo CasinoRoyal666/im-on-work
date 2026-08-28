@@ -49,7 +49,7 @@ export interface Persist {
 }
 
 export const uid = () =>
-  Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4);
+  crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4);
 
 export const STATUS_ORDER: Status[] = ["created", "progress", "completed"];
 
