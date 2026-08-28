@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { ModeData, Persist, Project, Status, Task, Texture, Theme } from "./types";
 import { uid } from "./types";
-import { PROJECT_COLORS, load, save } from "./store";
+import { PROJECT_COLORS, seed } from "./store";
+import { loadState, saveState } from "./api";
 import Header from "./components/Header";
 import Sidebar from "./components/Sidebar";
 import Board from "./components/Board";
@@ -10,13 +11,32 @@ import TaskDrawer from "./components/TaskDrawer";
 import { IInbox } from "./components/Icons";
 
 const FLY_MS = 780;
+const SAVE_DEBOUNCE_MS = 600;
 
 export default function App() {
-  const [state, setState] = useState<Persist>(load);
+  const [state, setState] = useState<Persist>(seed);
+  const [hydrated, setHydrated] = useState(false);
   const [flyingTask, setFlyingTask] = useState<string | null>(null);
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+  const saveTimer = useRef<number>(0);
 
-  useEffect(() => save(state), [state]);
+  // load persisted state from the backend on mount
+  useEffect(() => {
+    loadState()
+      .then((p) => {
+        if (p) setState(p);
+      })
+      .catch(() => {})
+      .finally(() => setHydrated(true));
+  }, []);
+
+  // debounced save to the backend on every change
+  useEffect(() => {
+    if (!hydrated) return;
+    window.clearTimeout(saveTimer.current);
+    saveTimer.current = window.setTimeout(() => saveState(state).catch(() => {}), SAVE_DEBOUNCE_MS);
+    return () => window.clearTimeout(saveTimer.current);
+  }, [state, hydrated]);
 
   const { mode } = state;
   const theme = state.themes[mode];
