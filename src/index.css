@@ -1,0 +1,158 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-display: "Unbounded", "Golos Text", system-ui, sans-serif;
+  --font-sans: "Golos Text", "Segoe UI", system-ui, sans-serif;
+
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-raise: var(--raise);
+  --color-ink: var(--ink);
+  --color-mut: var(--mut);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
+  --color-accent-soft: color-mix(in srgb, var(--accent) 11%, transparent);
+  --color-ok: var(--ok);
+  --color-ok-soft: color-mix(in srgb, var(--ok) 13%, transparent);
+  --color-warn: var(--warn);
+
+  --shadow-lift: 0 1px 2px rgb(24 22 16 / 0.05), 0 10px 26px -14px rgb(24 22 16 / 0.28);
+  --shadow-pop: 0 24px 64px -20px rgb(12 11 8 / 0.4);
+}
+
+/* ---------- палитра: светлая ---------- */
+:root {
+  --bg: #f1f2ec;
+  --surface: #fafaf5;
+  --raise: #ffffff;
+  --ink: #24231e;
+  --mut: #7d7a6e;
+  --line: #e1e0d4;
+  --accent: #0e7c6b;
+  --on-accent: #ffffff;
+  --ok: #2f9461;
+  --warn: #c98a12;
+}
+
+/* домашний режим — чуть теплее */
+:root[data-mode="home"] {
+  --bg: #f6f0e6;
+  --surface: #fbf7ef;
+  --line: #e5ddcc;
+  --mut: #867c6a;
+}
+
+/* ---------- палитра: тёмная ---------- */
+:root[data-dark="true"] {
+  --bg: #15161a;
+  --surface: #1d1f24;
+  --raise: #24262d;
+  --ink: #ecebe4;
+  --mut: #94928a;
+  --line: #2d3037;
+  --ok: #43b379;
+}
+:root[data-dark="true"][data-mode="home"] {
+  --bg: #191712;
+  --surface: #201d17;
+  --raise: #27241d;
+  --line: #322d23;
+  --mut: #9d9482;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  transition: background-color 0.4s ease, color 0.4s ease;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 80%, transparent);
+  color: var(--on-accent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---------- текстуры фона ---------- */
+.tex-grid {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--ink) 5%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--ink) 5%, transparent) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+.tex-dots {
+  background-image: radial-gradient(color-mix(in srgb, var(--ink) 9%, transparent) 1.3px, transparent 1.3px);
+  background-size: 20px 20px;
+}
+.noise {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.035;
+  mix-blend-mode: multiply;
+}
+:root[data-dark="true"] .noise {
+  mix-blend-mode: screen;
+  opacity: 0.05;
+}
+
+/* ---------- анимации ---------- */
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.72);
+  }
+}
+.animate-pop {
+  animation: pop 0.18s cubic-bezier(0.2, 1.1, 0.4, 1) both;
+}
+.animate-pulse-dot {
+  animation: pulse-dot 1.6s ease-in-out infinite;
+}
+
+/* ---------- скроллбар ---------- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--mut) 45%, transparent) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--mut) 40%, transparent);
+  border-radius: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-pop,
+  .animate-pulse-dot {
+    animation: none !important;
+  }
+}
